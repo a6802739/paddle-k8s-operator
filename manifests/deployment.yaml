@@ -1,0 +1,37 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  labels:
+    ksonnet.io/component: my-paddle-operator
+  name: paddle-operator
+  namespace: default
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        name: paddle-operator
+    spec:
+      containers:
+      - command:
+        - paddlejob
+        - --alsologtostderr
+        env:
+        - name: MY_POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: MY_POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        image: ppl521/paddle-operator:2.0
+        name: paddle-operator
+        volumeMounts:
+        - mountPath: /etc/config
+          name: config-volume
+      serviceAccountName: paddle-operator
+      volumes:
+      - configMap:
+          name: paddle-operator-config
+        name: config-volume

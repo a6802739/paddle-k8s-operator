@@ -1,0 +1,8 @@
+- repo: git://github.com/dnephin/pre-commit-golang
+  sha: v0.3
+  hooks:
+    - id: go-fmt
+    - id: go-vet
+    - id: go-lint
+      files: \.go$
+      exclude: (.*\/client\/.*\.go|.*\generated\.deepcopy\.go)$

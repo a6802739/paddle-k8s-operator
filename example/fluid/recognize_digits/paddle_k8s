@@ -1,0 +1,102 @@
+#!/bin/bash
+set -x
+
+check_failed_cnt() {
+  max_failed=$1
+  failed_count=$(python /root/k8s_tools.py count_pods_by_phase paddle-job=${PADDLE_JOB_NAME} Failed)
+  if [ $failed_count -gt $max_failed ]; then
+    stdbuf -oL echo "Failed trainer count beyond the threadhold: "$max_failed
+    echo "Failed trainer count beyond the threshold: " $max_failed > /dev/termination-log
+    exit 0
+  fi
+}
+
+check_trainer_ret() {
+  ret=$1
+  stdbuf -oL echo "job returned $ret...setting pod return message..."
+  stdbuf -oL echo "==============================="
+
+  if [ $ret -eq 136 ] ; then
+    echo "Error Arithmetic Operation(Floating Point Exception)" > /dev/termination-log
+  elif [ $ret -eq 139 ] ; then
+    echo "Segmentation Fault" > /dev/termination-log
+  elif [ $ret -eq 1 ] ; then
+    echo "General Error" > /dev/termination-log
+  elif [ $ret -eq 134 ] ; then
+    echo "Program Abort" > /dev/termination-log
+  fi
+  stdbuf -oL echo "termination log wroted..."
+  exit $ret
+}
+
+start_fluid_process() {
+  pserver_label="paddle-job-pserver=${PADDLE_JOB_NAME}"
+  trainer_label="paddle-job=${PADDLE_JOB_NAME}"
+  task_index=""
+  export PADDLE_TRAINING_ROLE=$1
+
+  export PADDLE_PSERVERS=${PSERVERS}
+  export PADDLE_TRAINERS=${TRAINERS}
+  export PADDLE_CURRENT_IP=${POD_IP}
+  export PADDLE_PSERVER_PORT=${PADDLE_INIT_PORT}
+
+  if [ "${PADDLE_TRAINING_ROLE}" == "PSERVER" ]; then
+    stdbuf -oL python /root/k8s_tools.py wait_pods_running ${pserver_label} ${PADDLE_PSERVERS}
+  fi
+
+  if [ "${PADDLE_TRAINING_ROLE}" == "TRAINER" ]; then
+    stdbuf -oL python /root/k8s_tools.py wait_pods_running ${trainer_label} ${PADDLE_TRAINERS}
+  fi
+
+  echo "Training Role is ${PADDLE_TRAINING_ROLE}"
+  export PADDLE_PSERVER_IPS=$(python /root/k8s_tools.py fetch_ips ${pserver_label} ${PADDLE_INIT_PORT})
+
+  if [ "${PADDLE_TRAINING_ROLE}" == "TRAINER" ]; then
+    check_failed_cnt 1
+    task_index=$(python /root/k8s_tools.py fetch_id ${trainer_label})
+  else
+    task_index=$(python /root/k8s_tools.py fetch_id ${pserver_label})
+  fi
+
+  export PADDLE_TRAINER_ID=${task_index}
+
+  stdbuf -oL sh -c "${ENTRY}"
+  check_trainer_ret $?
+}
+
+start_new_pserver() {
+  echo "Start a new pserver process!"
+}
+
+start_new_trainer() {
+  echo "Start a new triner process!"
+}
+
+usage() {
+    echo "usage: paddle_k8s [<args>]:"
+    echo "  start_trainer  [v1|v2]    Start a trainer process with fluid API"
+    echo "  start_pserver             Start a pserver process"
+    echo "  start_new_pserver         Start a new pserver process"
+    echo "  start_new_trainer         Start a new triner process"
+}
+
+case "$1" in
+    start_pserver)
+        start_fluid_process "PSERVER"
+        ;;
+    start_trainer)
+        start_fluid_process "TRAINER"
+        ;;
+    start_new_trainer)
+        start_new_trainer
+        ;;
+    start_new_pserver)
+        start_new_pserver
+        ;;
+    --help)
+        usage
+        ;;
+    *)
+        usage
+        ;;
+esac

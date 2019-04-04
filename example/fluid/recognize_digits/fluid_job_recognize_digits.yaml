@@ -1,0 +1,33 @@
+apiVersion: paddlepaddle.org/v1
+kind: PaddleJob
+metadata:
+  name: my-paddle-job
+spec:
+  image: "kubeflow/paddle-mnist-test:1.0"
+  port: 7164
+  ports_num: 1
+  ports_num_for_sparse: 1
+  fault_tolerant: false
+  trainer:
+    entrypoint: "python /workspace/recognize_digits.py train"
+    workspace: "/workspace"
+    passes: 50
+    min-instance: 3
+    max-instance: 2
+    resources:
+      limits:
+        cpu: "200m"
+        memory: "200Mi"
+      requests:
+        cpu: "200m"
+        memory: "200Mi"
+  pserver:
+    min-instance: 2
+    max-instance: 2
+    resources:
+      limits:
+        cpu: "800m"
+        memory: "600Mi"
+      requests:
+        cpu: "500m"
+        memory: "200Mi"
