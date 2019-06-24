@@ -25,7 +25,7 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.name
-        image: ppl521/paddle-operator:2.0
+        image: ppl521/paddle-operator:6.0
         name: paddle-operator
         volumeMounts:
         - mountPath: /etc/config
